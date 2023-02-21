@@ -115,11 +115,11 @@ function rollbarSourcemaps({
               filename: asset.original_file,
               contentType: 'application/json'
             });
-            uploadSourcemap(form, {
+            return uploadSourcemap(form, {
               filename: asset.original_file,
               rollbarEndpoint,
               silent
-            });
+            })
           })
         );
       } catch (error) {
