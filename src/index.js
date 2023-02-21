@@ -46,6 +46,7 @@ export default function rollbarSourcemaps({
   version,
   baseUrl,
   silent = false,
+  ignoreUploadErrors = true,
   rollbarEndpoint = ROLLBAR_ENDPOINT,
   base = '/',
   outputDir = 'dist'
@@ -80,7 +81,10 @@ export default function rollbarSourcemaps({
               original_file: `${base}${sourcePath}`
             }
           } catch (error) {
-            console.error(`Error reading sourcemap file ${sourcemapLocation}: ${error}`, true)
+            console.error(
+              `Error reading sourcemap file ${sourcemapLocation}: ${error}`,
+              true
+            )
             return null
           }
         })
@@ -88,23 +92,32 @@ export default function rollbarSourcemaps({
 
       if (!sourcemaps.length) return
 
-      Promise.all(
-        sourcemaps.map((asset) => {
-          const form = new FormData()
-          form.append('access_token', accessToken)
-          form.append('version', version)
-          form.append('minified_url', `${baseUrl}${asset.original_file}`)
-          form.append('source_map', asset.content, {
-            filename: asset.original_file,
-            contentType: 'application/json'
+      try {
+        await Promise.all(
+          sourcemaps.map((asset) => {
+            const form = new FormData()
+            form.append('access_token', accessToken)
+
+            form.append('version', version)
+            form.append('minified_url', `${baseUrl}${asset.original_file}`)
+            form.append('source_map', asset.content, {
+              filename: asset.original_file,
+              contentType: 'application/json'
+            })
+            uploadSourcemap(form, {
+              filename: asset.original_file,
+              rollbarEndpoint,
+              silent
+            })
           })
-          uploadSourcemap(form, {
-            filename: asset.original_file,
-            rollbarEndpoint,
-            silent
-          })
-        })
-      )
+        )
+      } catch (error) {
+        if (ignoreUploadErrors) {
+          console.error('Uploading sourcemaps to Rollbar failed: ', error)
+          return
+        }
+        throw error
+      }
     }
   }
 }
